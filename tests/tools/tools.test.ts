@@ -5,6 +5,8 @@ import { registerSendMessage } from '../../src/tools/send-message.js';
 import { registerSendNotification } from '../../src/tools/send-notification.js';
 import { registerSendFile } from '../../src/tools/send-file.js';
 import { registerCheckMessages } from '../../src/tools/check-messages.js';
+import { registerAskQuestion } from '../../src/tools/ask-question.js';
+import { registerWaitForMessage } from '../../src/tools/wait-for-message.js';
 
 describe('Tool Registration', () => {
   let server: McpServer;
@@ -17,6 +19,8 @@ describe('Tool Registration', () => {
       sendMessage: vi.fn(),
       sendEmbed: vi.fn(),
       sendFile: vi.fn(),
+      askQuestion: vi.fn(),
+      waitForMessage: vi.fn(),
       getActiveChannel: vi.fn(() => ({ name: 'test-channel' })),
       buffer: {
         getAll: vi.fn(() => []),
@@ -25,13 +29,15 @@ describe('Tool Registration', () => {
     };
   });
 
-  it('registers all 5 tools without errors', () => {
+  it('registers all 7 tools without errors', () => {
     expect(() => {
       registerSetChannel(server, mockDiscord);
       registerSendMessage(server, mockDiscord);
       registerSendNotification(server, mockDiscord);
       registerSendFile(server, mockDiscord);
       registerCheckMessages(server, mockDiscord);
+      registerAskQuestion(server, mockDiscord);
+      registerWaitForMessage(server, mockDiscord);
     }).not.toThrow();
   });
 });
