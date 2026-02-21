@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import type { DiscordClient } from '../discord/client.js';
+import { clearPending } from '../discord/pending-signal.js';
 
 export function registerCheckMessages(server: McpServer, discord: DiscordClient): void {
   server.registerTool('check_messages', {
@@ -17,6 +18,10 @@ export function registerCheckMessages(server: McpServer, discord: DiscordClient)
       const messages = since_last_check
         ? discord.buffer.getNewSinceLastRead(limit)
         : discord.buffer.getAll(limit);
+
+      if (messages.length > 0) {
+        clearPending();
+      }
 
       return {
         content: [{

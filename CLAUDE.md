@@ -22,7 +22,11 @@ Persephone is a Claude Code plugin (MCP server) connecting Claude Code to Discor
 
 **Tools** (`src/tools/`): Each file exports a `register*` function that registers one MCP tool on the server. All tools require `set_channel` to be called first (except `set_channel` itself). Interactive tools (`ask_question`, `wait_for_message`) block until the user responds or timeout is reached.
 
-**Skill** (`skills/connect/SKILL.md`): Guides Claude through the channel connection flow.
+**Pending Signal** (`src/discord/pending-signal.ts`): File-based IPC. Writes a temp file (`persephone-pending.json` in OS tmpdir) when Discord messages arrive; cleared when messages are read. Enables the Stop hook to detect unread messages.
+
+**Hooks** (`hooks/`): Claude Code Stop hook (`check-discord.mjs`) that blocks Claude from stopping when there are unread Discord messages, prompting it to check and respond automatically.
+
+**Skill** (`skills/connect/SKILL.md`): Guides Claude through the channel connection flow and Discord listening loop.
 
 ## Configuration
 

@@ -12,6 +12,7 @@ import {
   type Message,
 } from 'discord.js';
 import { MessageBuffer, type BufferedMessage } from './message-buffer.js';
+import { signalPending, clearPending } from './pending-signal.js';
 
 export class DiscordClient {
   private client: Client;
@@ -37,12 +38,14 @@ export class DiscordClient {
       if (message.author.bot) return;
       if (!this.activeChannel || message.channel.id !== this.activeChannel.id) return;
 
+      const author = message.author.displayName ?? message.author.username;
       this.buffer.push({
-        author: message.author.displayName ?? message.author.username,
+        author,
         content: message.content,
         timestamp: message.createdAt.toISOString(),
         attachments: message.attachments.map((a) => a.url),
       });
+      signalPending(author, message.content);
     });
 
     this.client.login(token);
@@ -186,6 +189,7 @@ export class DiscordClient {
     // Check buffer first for unread messages
     const existing = this.buffer.getNewSinceLastRead(1);
     if (existing.length > 0) {
+      clearPending();
       return existing[0];
     }
 
@@ -209,6 +213,7 @@ export class DiscordClient {
           timestamp: message.createdAt.toISOString(),
           attachments: message.attachments.map((a) => a.url),
         };
+        clearPending();
         resolve(buffered);
       };
 
