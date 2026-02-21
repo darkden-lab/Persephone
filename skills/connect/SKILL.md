@@ -21,3 +21,19 @@ The user wants to connect Claude Code to a Discord channel. Extract the channel 
    - Send messages from Claude to Discord
    - Receive messages sent in the Discord channel
    - Send notifications and files
+   - Ask interactive questions with buttons via `ask_question`
+
+## Discord Listening
+
+After connecting, you should periodically check for Discord messages using `check_messages` between tasks. When the user is idle or waiting, use `wait_for_message` to actively listen for Discord input.
+
+Treat messages received from Discord exactly like messages typed in the CLI — process them, respond to them via `send_message`, and continue listening.
+
+To enter a listening loop:
+1. Call `wait_for_message` with a reasonable timeout (e.g., 120-300 seconds)
+2. Process the received message as a normal user request
+3. Respond via `send_message` or `send_notification`
+4. Call `wait_for_message` again
+5. If the user says "salir", "exit", or "stop listening", stop the loop
+
+For decisions and choices, prefer `ask_question` with buttons over plain text questions.

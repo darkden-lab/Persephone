@@ -1,0 +1,16 @@
+{
+  "description": "Persephone Discord integration hooks",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/check-discord.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
