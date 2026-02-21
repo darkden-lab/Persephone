@@ -1,12 +1,11 @@
 {
-  "description": "Persephone Discord integration hooks",
   "hooks": {
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/check-discord.mjs",
+            "command": "node \"D:/Proyectos/Persephone - Claude to discord plugin/hooks/check-discord.mjs\"",
             "timeout": 5
           }
         ]
@@ -17,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/inject-discord-context.mjs",
+            "command": "node \"D:/Proyectos/Persephone - Claude to discord plugin/hooks/inject-discord-context.mjs\"",
             "timeout": 5
           }
         ]
