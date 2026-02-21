@@ -5,6 +5,10 @@ import {
   TextChannel,
   EmbedBuilder,
   AttachmentBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
   type Message,
 } from 'discord.js';
 import { MessageBuffer, type BufferedMessage } from './message-buffer.js';
@@ -46,6 +50,12 @@ export class DiscordClient {
 
   async waitUntilReady(): Promise<void> {
     return this.readyPromise;
+  }
+
+  async destroy(): Promise<void> {
+    this.activeChannel = null;
+    this.buffer.clear();
+    this.client.destroy();
   }
 
   async setChannel(channelId: string): Promise<{ channel_name: string; guild_name: string }> {
@@ -102,6 +112,108 @@ export class DiscordClient {
     });
     const fileUrl = msg.attachments.first()?.url ?? '';
     return { message_id: msg.id, file_url: fileUrl };
+  }
+
+  async askQuestion(
+    question: string,
+    options: string[],
+    timeoutSeconds = 120,
+  ): Promise<{ selected: string; respondent: string }> {
+    const channel = this.getActiveChannel();
+
+    const BUTTON_STYLES = [
+      ButtonStyle.Primary,
+      ButtonStyle.Secondary,
+      ButtonStyle.Success,
+      ButtonStyle.Danger,
+      ButtonStyle.Primary,
+    ];
+
+    const buttons = options.map((label, i) =>
+      new ButtonBuilder()
+        .setCustomId(`persephone_opt_${i}`)
+        .setLabel(label)
+        .setStyle(BUTTON_STYLES[i % BUTTON_STYLES.length]),
+    );
+
+    // Discord allows max 5 buttons per row
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+    for (let i = 0; i < buttons.length; i += 5) {
+      rows.push(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)),
+      );
+    }
+
+    const msg = await channel.send({
+      content: question,
+      components: rows,
+    });
+
+    try {
+      const interaction = await msg.awaitMessageComponent({
+        componentType: ComponentType.Button,
+        time: timeoutSeconds * 1000,
+      });
+
+      const selectedIndex = parseInt(interaction.customId.replace('persephone_opt_', ''), 10);
+      const selected = options[selectedIndex];
+      const respondent = interaction.user.displayName ?? interaction.user.username;
+
+      // Update message to show selection and remove buttons
+      await interaction.update({
+        content: `${question}\n\n**${respondent}** selected: **${selected}**`,
+        components: [],
+      });
+
+      return { selected, respondent };
+    } catch {
+      // Timeout — disable buttons
+      const disabledRows = rows.map((row) => {
+        const disabledRow = new ActionRowBuilder<ButtonBuilder>();
+        disabledRow.addComponents(
+          row.components.map((btn) => ButtonBuilder.from(btn.toJSON()).setDisabled(true)),
+        );
+        return disabledRow;
+      });
+      await msg.edit({ content: `${question}\n\n*(timed out)*`, components: disabledRows });
+      throw new Error(`No response within ${timeoutSeconds} seconds`);
+    }
+  }
+
+  async waitForMessage(timeoutSeconds = 120): Promise<BufferedMessage> {
+    const channel = this.getActiveChannel();
+
+    // Check buffer first for unread messages
+    const existing = this.buffer.getNewSinceLastRead(1);
+    if (existing.length > 0) {
+      return existing[0];
+    }
+
+    // Wait for a new message via event listener
+    return new Promise<BufferedMessage>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.client.off(Events.MessageCreate, handler);
+        reject(new Error(`No message received within ${timeoutSeconds} seconds`));
+      }, timeoutSeconds * 1000);
+
+      const handler = (message: Message) => {
+        if (message.author.bot) return;
+        if (message.channel.id !== channel.id) return;
+
+        clearTimeout(timeout);
+        this.client.off(Events.MessageCreate, handler);
+
+        const buffered: BufferedMessage = {
+          author: message.author.displayName ?? message.author.username,
+          content: message.content,
+          timestamp: message.createdAt.toISOString(),
+          attachments: message.attachments.map((a) => a.url),
+        };
+        resolve(buffered);
+      };
+
+      this.client.on(Events.MessageCreate, handler);
+    });
   }
 
   private splitMessage(content: string, maxLength: number): string[] {

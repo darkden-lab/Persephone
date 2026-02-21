@@ -20,7 +20,7 @@ Persephone is a Claude Code plugin (MCP server) connecting Claude Code to Discor
 
 **Message Buffer** (`src/discord/message-buffer.ts`): Circular buffer (capacity 100) storing incoming Discord messages. Tracks a "last read" position for polling via `check_messages`.
 
-**Tools** (`src/tools/`): Each file exports a `register*` function that registers one MCP tool on the server. All tools require `set_channel` to be called first (except `set_channel` itself).
+**Tools** (`src/tools/`): Each file exports a `register*` function that registers one MCP tool on the server. All tools require `set_channel` to be called first (except `set_channel` itself). Interactive tools (`ask_question`, `wait_for_message`) block until the user responds or timeout is reached.
 
 **Skill** (`skills/connect/SKILL.md`): Guides Claude through the channel connection flow.
 
@@ -38,6 +38,8 @@ Persephone is a Claude Code plugin (MCP server) connecting Claude Code to Discor
 - `send_file` enforces 25 MB max file size and requires regular files (no directories/symlinks)
 - `set_channel` validates that the channel ID is a numeric Discord snowflake
 - `MessageBuffer.getAll(0)` and `getNewSinceLastRead(0)` return empty arrays (limit=0 is handled)
+- `ask_question` supports max 5 button options per row (Discord component limit)
+- `ask_question` and `wait_for_message` default to 120 second timeout
 
 ## Testing
 
