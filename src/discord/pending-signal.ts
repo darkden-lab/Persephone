@@ -1,8 +1,10 @@
-import { writeFileSync, unlinkSync, existsSync, readFileSync } from 'node:fs';
+import { writeFileSync, unlinkSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 
-const SIGNAL_FILE = join(tmpdir(), 'persephone-pending.json');
+// Use a user-scoped directory instead of world-readable tmpdir
+const SIGNAL_DIR = join(homedir(), '.claude', 'persephone');
+const SIGNAL_FILE = join(SIGNAL_DIR, `pending-${process.pid}.json`);
 
 export interface PendingInfo {
   count: number;
@@ -10,28 +12,33 @@ export interface PendingInfo {
 }
 
 export function signalPending(author: string, content: string): void {
-  let count = 1;
   try {
-    if (existsSync(SIGNAL_FILE)) {
+    mkdirSync(SIGNAL_DIR, { recursive: true });
+
+    // Read existing count — single readFileSync in try/catch avoids TOCTOU race
+    let count = 1;
+    try {
       const existing = JSON.parse(readFileSync(SIGNAL_FILE, 'utf8'));
       count = (existing.count ?? 0) + 1;
+    } catch {
+      // File doesn't exist or is invalid — start fresh
     }
-  } catch {
-    // ignore parse errors
-  }
 
-  const info: PendingInfo = {
-    count,
-    latest: { author, preview: content.slice(0, 100) },
-  };
-  writeFileSync(SIGNAL_FILE, JSON.stringify(info));
+    const info: PendingInfo = {
+      count,
+      latest: { author, preview: content.slice(0, 100) },
+    };
+    writeFileSync(SIGNAL_FILE, JSON.stringify(info), { mode: 0o600 });
+  } catch {
+    // Silently fail — signal is best-effort
+  }
 }
 
 export function clearPending(): void {
   try {
-    if (existsSync(SIGNAL_FILE)) unlinkSync(SIGNAL_FILE);
+    unlinkSync(SIGNAL_FILE);
   } catch {
-    // ignore
+    // File may not exist — that's fine
   }
 }
 

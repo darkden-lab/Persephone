@@ -14,7 +14,8 @@ export function registerSendMessage(server: McpServer, discord: DiscordClient): 
     try {
       let formatted = content;
       if (format === 'codeblock') {
-        formatted = '```\n' + content + '\n```';
+        const escaped = content.replace(/```/g, '\\`\\`\\`');
+        formatted = '```\n' + escaped + '\n```';
       }
       // "text" and "markdown" send as-is (Discord renders markdown natively)
       const result = await discord.sendMessage(formatted);

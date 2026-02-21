@@ -31,13 +31,11 @@ export class MessageBuffer {
   }
 
   getNewSinceLastRead(limit?: number): BufferedMessage[] {
+    if (limit !== undefined && limit <= 0) return [];
     const newMessages = this.messages.slice(this.lastReadIndex);
     this.lastReadIndex = this.messages.length;
-    if (limit !== undefined) {
-      if (limit <= 0) return [];
-      if (limit < newMessages.length) {
-        return newMessages.slice(-limit);
-      }
+    if (limit !== undefined && limit < newMessages.length) {
+      return newMessages.slice(-limit);
     }
     return newMessages;
   }
