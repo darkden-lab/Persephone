@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "persephone": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/server.js"],
+      "env": {
+        "DISCORD_BOT_TOKEN": "${DISCORD_BOT_TOKEN}"
+      }
+    }
+  }
+}

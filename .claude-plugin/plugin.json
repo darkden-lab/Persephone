@@ -1,0 +1,9 @@
+{
+  "name": "persephone",
+  "description": "Connect Claude Code with Discord for bidirectional messaging, notifications, and file sharing",
+  "version": "0.1.0",
+  "author": {
+    "name": "darkden-lab"
+  },
+  "keywords": ["discord", "messaging", "notifications"]
+}
