@@ -1,0 +1,13 @@
+{
+  "name": "persephone-local",
+  "owner": {
+    "name": "darkden-lab"
+  },
+  "plugins": [
+    {
+      "name": "persephone",
+      "source": "./",
+      "description": "Connect Claude Code with Discord for bidirectional messaging"
+    }
+  ]
+}
