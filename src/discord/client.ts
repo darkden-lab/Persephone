@@ -19,6 +19,7 @@ export class DiscordClient {
   private activeChannel: TextChannel | null = null;
   readonly buffer: MessageBuffer;
   private readyPromise: Promise<void>;
+  private pendingWaitAbort: AbortController | null = null;
 
   constructor(token: string) {
     this.buffer = new MessageBuffer(100);
@@ -35,17 +36,21 @@ export class DiscordClient {
     });
 
     this.client.on(Events.MessageCreate, (message: Message) => {
-      if (message.author.bot) return;
-      if (!this.activeChannel || message.channel.id !== this.activeChannel.id) return;
+      try {
+        if (message.author.bot) return;
+        if (!this.activeChannel || message.channel.id !== this.activeChannel.id) return;
 
-      const author = message.author.displayName ?? message.author.username;
-      this.buffer.push({
-        author,
-        content: message.content,
-        timestamp: message.createdAt.toISOString(),
-        attachments: message.attachments.map((a) => a.url),
-      });
-      signalPending(author, message.content);
+        const author = message.author.displayName ?? message.author.username;
+        this.buffer.push({
+          author,
+          content: message.content,
+          timestamp: message.createdAt.toISOString(),
+          attachments: message.attachments.map((a) => a.url),
+        });
+        signalPending(author, message.content);
+      } catch {
+        // Silently ignore errors in message handler to avoid crashing the bot
+      }
     });
 
     this.client.login(token);
@@ -56,6 +61,8 @@ export class DiscordClient {
   }
 
   async destroy(): Promise<void> {
+    this.pendingWaitAbort?.abort();
+    this.pendingWaitAbort = null;
     this.activeChannel = null;
     this.buffer.clear();
     this.client.destroy();
@@ -159,7 +166,7 @@ export class DiscordClient {
       });
 
       const selectedIndex = parseInt(interaction.customId.replace('persephone_opt_', ''), 10);
-      const selected = options[selectedIndex];
+      const selected = Number.isNaN(selectedIndex) ? options[0] : (options[selectedIndex] ?? options[0]);
       const respondent = interaction.user.displayName ?? interaction.user.username;
 
       // Update message to show selection and remove buttons
@@ -193,10 +200,27 @@ export class DiscordClient {
       return existing[0];
     }
 
-    // Wait for a new message via event listener
+    // Wait for a new message — the constructor's MessageCreate handler
+    // already pushes to buffer and calls signalPending, so we just poll
+    // the buffer to avoid double-processing.
+    this.pendingWaitAbort?.abort();
+    const abortController = new AbortController();
+    this.pendingWaitAbort = abortController;
+
     return new Promise<BufferedMessage>((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const cleanup = () => {
+        clearTimeout(timeout);
         this.client.off(Events.MessageCreate, handler);
+        this.pendingWaitAbort = null;
+      };
+
+      abortController.signal.addEventListener('abort', () => {
+        cleanup();
+        reject(new Error('Wait aborted due to client shutdown'));
+      });
+
+      const timeout = setTimeout(() => {
+        cleanup();
         reject(new Error(`No message received within ${timeoutSeconds} seconds`));
       }, timeoutSeconds * 1000);
 
@@ -204,17 +228,22 @@ export class DiscordClient {
         if (message.author.bot) return;
         if (message.channel.id !== channel.id) return;
 
-        clearTimeout(timeout);
-        this.client.off(Events.MessageCreate, handler);
+        cleanup();
 
-        const buffered: BufferedMessage = {
-          author: message.author.displayName ?? message.author.username,
-          content: message.content,
-          timestamp: message.createdAt.toISOString(),
-          attachments: message.attachments.map((a) => a.url),
-        };
+        // Read from buffer instead of creating a duplicate object
+        const newMessages = this.buffer.getNewSinceLastRead(1);
         clearPending();
-        resolve(buffered);
+        if (newMessages.length > 0) {
+          resolve(newMessages[0]);
+        } else {
+          // Fallback: construct from message (should not happen normally)
+          resolve({
+            author: message.author.displayName ?? message.author.username,
+            content: message.content,
+            timestamp: message.createdAt.toISOString(),
+            attachments: message.attachments.map((a) => a.url),
+          });
+        }
       };
 
       this.client.on(Events.MessageCreate, handler);

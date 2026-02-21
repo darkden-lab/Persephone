@@ -11,7 +11,6 @@ import { registerWaitForMessage } from './tools/wait-for-message.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) {
-  console.error('DISCORD_BOT_TOKEN environment variable is required');
   process.exit(1);
 }
 
@@ -19,7 +18,7 @@ const discord = new DiscordClient(token);
 
 const server = new McpServer({
   name: 'persephone',
-  version: '0.1.0',
+  version: '0.2.0',
 });
 
 registerSetChannel(server, discord);
@@ -30,8 +29,13 @@ registerCheckMessages(server, discord);
 registerAskQuestion(server, discord);
 registerWaitForMessage(server, discord);
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+try {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+} catch {
+  await discord.destroy();
+  process.exit(1);
+}
 
 async function shutdown() {
   await discord.destroy();

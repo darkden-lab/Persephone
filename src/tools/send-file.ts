@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import { existsSync, statSync } from 'node:fs';
-import { resolve, isAbsolute } from 'node:path';
+import { existsSync, lstatSync } from 'node:fs';
+import { isAbsolute, normalize } from 'node:path';
 import type { DiscordClient } from '../discord/client.js';
 
 // Discord's file size limit (25 MB for standard bots)
@@ -16,47 +16,60 @@ export function registerSendFile(server: McpServer, discord: DiscordClient): voi
     },
   }, async ({ file_path, message }) => {
     try {
-      // Resolve to absolute path and normalize
-      const resolvedPath = resolve(file_path);
-
-      if (!isAbsolute(resolvedPath)) {
+      // Require absolute path from the caller (no resolution of relative paths)
+      if (!isAbsolute(file_path)) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: 'File path must be absolute' }) }],
           isError: true,
         };
       }
 
-      if (!existsSync(resolvedPath)) {
+      // Normalize but reject path traversal sequences
+      const normalizedPath = normalize(file_path);
+      if (normalizedPath !== file_path && normalizedPath.includes('..')) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: `File not found: ${resolvedPath}` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Path traversal is not allowed' }) }],
           isError: true,
         };
       }
 
-      // Verify it's a regular file, not a directory or symlink to sensitive location
-      const stats = statSync(resolvedPath);
-      if (!stats.isFile()) {
+      if (!existsSync(normalizedPath)) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'File not found' }) }],
+          isError: true,
+        };
+      }
+
+      // Use lstatSync to detect symlinks (do not follow them)
+      const lstats = lstatSync(normalizedPath);
+      if (lstats.isSymbolicLink()) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Symlinks are not allowed' }) }],
+          isError: true,
+        };
+      }
+
+      if (!lstats.isFile()) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Path is not a regular file' }) }],
           isError: true,
         };
       }
 
-      // Check file size before attempting upload
-      if (stats.size > MAX_FILE_SIZE) {
+      if (lstats.size > MAX_FILE_SIZE) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: `File exceeds Discord's 25 MB limit (${(stats.size / 1024 / 1024).toFixed(1)} MB)` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `File exceeds Discord's 25 MB limit (${(lstats.size / 1024 / 1024).toFixed(1)} MB)` }) }],
           isError: true,
         };
       }
 
-      const result = await discord.sendFile(resolvedPath, message);
+      const result = await discord.sendFile(normalizedPath, message);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
     } catch (error) {
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ error: String(error) }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Failed to send file' }) }],
         isError: true,
       };
     }
