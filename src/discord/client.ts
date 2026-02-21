@@ -13,7 +13,7 @@ export class DiscordClient {
   private client: Client;
   private activeChannel: TextChannel | null = null;
   readonly buffer: MessageBuffer;
-  private ready = false;
+  private readyPromise: Promise<void>;
 
   constructor(token: string) {
     this.buffer = new MessageBuffer(100);
@@ -23,6 +23,10 @@ export class DiscordClient {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
       ],
+    });
+
+    this.readyPromise = new Promise<void>((resolve) => {
+      this.client.once(Events.ClientReady, () => resolve());
     });
 
     this.client.on(Events.MessageCreate, (message: Message) => {
@@ -37,18 +41,15 @@ export class DiscordClient {
       });
     });
 
-    this.client.once(Events.ClientReady, () => {
-      this.ready = true;
-    });
-
     this.client.login(token);
   }
 
-  isReady(): boolean {
-    return this.ready;
+  async waitUntilReady(): Promise<void> {
+    return this.readyPromise;
   }
 
   async setChannel(channelId: string): Promise<{ channel_name: string; guild_name: string }> {
+    await this.readyPromise;
     const channel = await this.client.channels.fetch(channelId);
     if (!channel || !(channel instanceof TextChannel)) {
       throw new Error(`Channel ${channelId} not found or is not a text channel`);
