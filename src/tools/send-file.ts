@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { existsSync, lstatSync } from 'node:fs';
-import { isAbsolute, normalize } from 'node:path';
+import { isAbsolute, normalize, resolve } from 'node:path';
 import type { MessagingClient } from '../platform/messaging-client.js';
 
 export function registerSendFile(server: McpServer, client: MessagingClient): void {
@@ -20,8 +20,11 @@ export function registerSendFile(server: McpServer, client: MessagingClient): vo
         };
       }
 
+      // Resolve to absolute path and reject if it differs from normalize()
+      // (indicates traversal like /safe/../../../etc/passwd)
+      const resolvedPath = resolve(file_path);
       const normalizedPath = normalize(file_path);
-      if (normalizedPath !== file_path && normalizedPath.includes('..')) {
+      if (resolvedPath !== normalizedPath) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Path traversal is not allowed' }) }],
           isError: true,

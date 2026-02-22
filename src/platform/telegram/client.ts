@@ -77,10 +77,8 @@ export class TelegramClient implements MessagingClient {
       if (callback) {
         const respondent = ctx.callbackQuery.from.first_name ??
           ctx.callbackQuery.from.username ?? 'User';
-        // Parse the selected label from data
-        const label = data.replace(/^persephone_\d+_/, '');
-        callback(label, respondent);
-        ctx.answerCbQuery(`Selected: ${label}`).catch(() => {});
+        callback(data, respondent);
+        ctx.answerCbQuery('Selected').catch(() => {});
       }
     });
 
@@ -340,7 +338,7 @@ export class TelegramClient implements MessagingClient {
 
     const inlineKeyboard = options.map((label, i) => [{
       text: label,
-      callback_data: `persephone_${questionId}_${label}`.slice(0, 64),
+      callback_data: `persephone_${questionId}_${i}`,
     }]);
 
     const msg = await this.bot.telegram.sendMessage(chatId, question, {
@@ -366,9 +364,10 @@ export class TelegramClient implements MessagingClient {
         reject(new Error(`No response within ${timeout} seconds`));
       }, timeout * 1000);
 
-      for (const option of options) {
-        const callbackKey = `persephone_${questionId}_${option}`.slice(0, 64);
-        this.pendingCallbacks.set(callbackKey, (selected, respondent) => {
+      for (let idx = 0; idx < options.length; idx++) {
+        const callbackKey = `persephone_${questionId}_${idx}`;
+        const label = options[idx];
+        this.pendingCallbacks.set(callbackKey, (_data, respondent) => {
           clearTimeout(timer);
           // Cleanup all callbacks for this question
           for (const [key] of this.pendingCallbacks) {
@@ -381,10 +380,10 @@ export class TelegramClient implements MessagingClient {
             chatId,
             msg.message_id,
             undefined,
-            `${question}\n\n*${respondent}* selected: *${selected}*`,
+            `${question}\n\n*${respondent}* selected: *${label}*`,
             { parse_mode: 'Markdown' },
           ).catch(() => {});
-          resolve({ selected, respondent });
+          resolve({ selected: label, respondent });
         });
       }
     });

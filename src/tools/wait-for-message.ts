@@ -6,7 +6,7 @@ export function registerWaitForMessage(server: McpServer, client: MessagingClien
   server.registerTool('wait_for_message', {
     description: 'Wait for a new message from a user in the active Discord channel. Blocks until a message is received or timeout is reached.',
     inputSchema: {
-      timeout: z.number().optional()
+      timeout: z.number().min(1).max(3600).optional()
         .describe('Timeout in seconds to wait for a message (default: 120)'),
     },
   }, async ({ timeout }) => {

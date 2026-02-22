@@ -35,8 +35,8 @@ export async function processAudioAttachment(
   targetMessage: BufferedMessage,
 ): Promise<void> {
   try {
-    // 1. Download the audio
-    const response = await fetch(audioUrl);
+    // 1. Download the audio (30s timeout to prevent hanging on slow CDN)
+    const response = await fetch(audioUrl, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) {
       targetMessage.transcription = '[download failed]';
       return;
