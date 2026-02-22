@@ -21,7 +21,7 @@ export function registerSendMessage(server: McpServer, client: MessagingClient):
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
-    } catch (error) {
+    } catch {
       return {
         content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Failed to send message' }) }],
         isError: true,
