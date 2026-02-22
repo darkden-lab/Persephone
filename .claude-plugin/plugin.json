@@ -1,10 +1,9 @@
 {
   "name": "persephone",
-  "description": "Connect Claude Code with Discord for bidirectional messaging, notifications, and file sharing",
-  "version": "0.2.0",
+  "description": "Connect Claude Code with Discord or Telegram for bidirectional messaging, notifications, and file sharing",
+  "version": "0.3.0",
   "author": {
     "name": "darkden-lab"
   },
-  "hooks": "./hooks/hooks.json",
-  "keywords": ["discord", "messaging", "notifications"]
+  "keywords": ["discord", "telegram", "messaging", "notifications"]
 }

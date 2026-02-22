@@ -1,16 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import { EmbedBuilder } from 'discord.js';
-import type { DiscordClient } from '../discord/client.js';
+import type { MessagingClient } from '../platform/messaging-client.js';
 
-const COLORS = {
-  success: 0x22c55e,
-  error: 0xef4444,
-  warning: 0xeab308,
-  info: 0x3b82f6,
-} as const;
-
-export function registerSendNotification(server: McpServer, discord: DiscordClient): void {
+export function registerSendNotification(server: McpServer, client: MessagingClient): void {
   server.registerTool('send_notification', {
     description: 'Send a rich embed notification to the active Discord channel.',
     inputSchema: {
@@ -24,19 +16,7 @@ export function registerSendNotification(server: McpServer, discord: DiscordClie
     },
   }, async ({ title, description, type, fields }) => {
     try {
-      const embed = new EmbedBuilder()
-        .setTitle(title)
-        .setDescription(description)
-        .setColor(COLORS[type])
-        .setTimestamp();
-
-      if (fields) {
-        for (const field of fields) {
-          embed.addFields({ name: field.name, value: field.value, inline: true });
-        }
-      }
-
-      const result = await discord.sendEmbed(embed);
+      const result = await client.sendNotification({ title, description, type, fields });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
