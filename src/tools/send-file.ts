@@ -2,12 +2,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { existsSync, lstatSync } from 'node:fs';
 import { isAbsolute, normalize } from 'node:path';
-import type { DiscordClient } from '../discord/client.js';
+import type { MessagingClient } from '../platform/messaging-client.js';
 
-// Discord's file size limit (25 MB for standard bots)
-const MAX_FILE_SIZE = 25 * 1024 * 1024;
-
-export function registerSendFile(server: McpServer, discord: DiscordClient): void {
+export function registerSendFile(server: McpServer, client: MessagingClient): void {
   server.registerTool('send_file', {
     description: 'Send a file attachment to the active Discord channel.',
     inputSchema: {
@@ -16,7 +13,6 @@ export function registerSendFile(server: McpServer, discord: DiscordClient): voi
     },
   }, async ({ file_path, message }) => {
     try {
-      // Require absolute path from the caller (no resolution of relative paths)
       if (!isAbsolute(file_path)) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: 'File path must be absolute' }) }],
@@ -24,7 +20,6 @@ export function registerSendFile(server: McpServer, discord: DiscordClient): voi
         };
       }
 
-      // Normalize but reject path traversal sequences
       const normalizedPath = normalize(file_path);
       if (normalizedPath !== file_path && normalizedPath.includes('..')) {
         return {
@@ -40,7 +35,6 @@ export function registerSendFile(server: McpServer, discord: DiscordClient): voi
         };
       }
 
-      // Use lstatSync to detect symlinks (do not follow them)
       const lstats = lstatSync(normalizedPath);
       if (lstats.isSymbolicLink()) {
         return {
@@ -56,14 +50,15 @@ export function registerSendFile(server: McpServer, discord: DiscordClient): voi
         };
       }
 
-      if (lstats.size > MAX_FILE_SIZE) {
+      const maxMB = client.maxFileSize / (1024 * 1024);
+      if (lstats.size > client.maxFileSize) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: `File exceeds Discord's 25 MB limit (${(lstats.size / 1024 / 1024).toFixed(1)} MB)` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `File exceeds ${maxMB} MB limit (${(lstats.size / 1024 / 1024).toFixed(1)} MB)` }) }],
           isError: true,
         };
       }
 
-      const result = await discord.sendFile(normalizedPath, message);
+      const result = await client.sendFile(normalizedPath, message);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };

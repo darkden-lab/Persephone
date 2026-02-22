@@ -1,8 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import type { DiscordClient } from '../discord/client.js';
+import type { MessagingClient } from '../platform/messaging-client.js';
 
-export function registerAskQuestion(server: McpServer, discord: DiscordClient): void {
+export function registerAskQuestion(server: McpServer, client: MessagingClient): void {
   server.registerTool('ask_question', {
     description: 'Send an interactive question with clickable buttons to the active Discord channel. Waits for the user to click a button and returns their selection. Max 5 options.',
     inputSchema: {
@@ -16,7 +16,7 @@ export function registerAskQuestion(server: McpServer, discord: DiscordClient): 
     },
   }, async ({ question, options, timeout }) => {
     try {
-      const result = await discord.askQuestion(question, options, timeout);
+      const result = await client.askQuestion(question, options, timeout);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };

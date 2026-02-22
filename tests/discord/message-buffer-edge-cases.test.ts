@@ -126,4 +126,48 @@ describe('MessageBuffer - Edge Cases', () => {
     });
     expect(buffer.getAll()[0].attachments).toHaveLength(3);
   });
+
+  it('stores and retrieves voice message fields', () => {
+    buffer.push({
+      author: 'u',
+      content: '',
+      timestamp: 't',
+      attachments: ['voice.ogg'],
+      transcription: '[transcribing...]',
+      voiceDurationMs: 5000,
+    });
+    const msg = buffer.getAll()[0];
+    expect(msg.transcription).toBe('[transcribing...]');
+    expect(msg.voiceDurationMs).toBe(5000);
+  });
+
+  it('allows in-place mutation of transcription field', () => {
+    const msg = {
+      author: 'u',
+      content: '',
+      timestamp: 't',
+      attachments: [],
+      transcription: '[transcribing...]',
+    };
+    buffer.push(msg);
+
+    // Mutate the original reference (simulates background transcription update)
+    msg.transcription = 'hello world';
+
+    // The buffer should reflect the mutation since it stores references
+    const retrieved = buffer.getAll()[0];
+    expect(retrieved.transcription).toBe('hello world');
+  });
+
+  it('handles messages without optional voice fields', () => {
+    buffer.push({
+      author: 'u',
+      content: 'normal message',
+      timestamp: 't',
+      attachments: [],
+    });
+    const msg = buffer.getAll()[0];
+    expect(msg.transcription).toBeUndefined();
+    expect(msg.voiceDurationMs).toBeUndefined();
+  });
 });

@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import type { DiscordClient } from '../discord/client.js';
-import { clearPending } from '../discord/pending-signal.js';
+import type { MessagingClient } from '../platform/messaging-client.js';
 
-export function registerCheckMessages(server: McpServer, discord: DiscordClient): void {
+export function registerCheckMessages(server: McpServer, client: MessagingClient): void {
   server.registerTool('check_messages', {
     description: 'Check for new messages in the active Discord channel. Returns messages from the buffer.',
     inputSchema: {
@@ -14,22 +13,32 @@ export function registerCheckMessages(server: McpServer, discord: DiscordClient)
     },
   }, async ({ since_last_check, limit }) => {
     try {
-      const channel = discord.getActiveChannel();
+      const channelName = client.getActiveChannelName();
       const messages = since_last_check
-        ? discord.buffer.getNewSinceLastRead(limit)
-        : discord.buffer.getAll(limit);
+        ? client.buffer.getNewSinceLastRead(limit)
+        : client.buffer.getAll(limit);
 
-      if (messages.length > 0) {
-        clearPending();
-      }
+      // Enrich voice/audio messages with transcription in content
+      const enriched = messages.map((msg) => {
+        if (!msg.transcription) return msg;
+        const durationSec = msg.voiceDurationMs != null
+          ? (msg.voiceDurationMs / 1000).toFixed(1)
+          : '?';
+        return {
+          ...msg,
+          content: msg.voiceDurationMs != null
+            ? `[Voice message (${durationSec}s)]: ${msg.transcription}`
+            : `[Audio transcription]: ${msg.transcription}`,
+        };
+      });
 
       return {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
-            channel_name: channel.name,
-            message_count: messages.length,
-            messages,
+            channel_name: channelName,
+            message_count: enriched.length,
+            messages: enriched,
           }),
         }],
       };

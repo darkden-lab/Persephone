@@ -1,7 +1,7 @@
 {
   "name": "persephone",
-  "version": "0.2.0",
-  "description": "Claude Code plugin for Discord integration",
+  "version": "0.3.0",
+  "description": "Claude Code plugin for Discord and Telegram integration",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
@@ -15,12 +15,17 @@
     "claude-code",
     "mcp",
     "discord",
+    "telegram",
     "plugin"
   ],
   "license": "Apache-2.0",
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "discord.js": "^14.25.1",
+    "mpg123-decoder": "^1.0.3",
+    "ogg-opus-decoder": "^1.7.3",
+    "telegraf": "^4.16.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

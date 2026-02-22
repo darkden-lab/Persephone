@@ -1,8 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import type { DiscordClient } from '../discord/client.js';
+import type { MessagingClient } from '../platform/messaging-client.js';
 
-export function registerSendMessage(server: McpServer, discord: DiscordClient): void {
+export function registerSendMessage(server: McpServer, client: MessagingClient): void {
   server.registerTool('send_message', {
     description: 'Send a text message to the active Discord channel.',
     inputSchema: {
@@ -17,8 +17,7 @@ export function registerSendMessage(server: McpServer, discord: DiscordClient): 
         const escaped = content.replace(/```/g, '\\`\\`\\`');
         formatted = '```\n' + escaped + '\n```';
       }
-      // "text" and "markdown" send as-is (Discord renders markdown natively)
-      const result = await discord.sendMessage(formatted);
+      const result = await client.sendMessage(formatted);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };

@@ -10,18 +10,22 @@ import { registerWaitForMessage } from '../../src/tools/wait-for-message.js';
 
 describe('Tool Registration', () => {
   let server: McpServer;
-  let mockDiscord: any;
+  let mockClient: any;
 
   beforeEach(() => {
     server = new McpServer({ name: 'test', version: '0.0.1' });
-    mockDiscord = {
+    mockClient = {
+      platform: 'discord',
+      maxMessageLength: 2000,
+      maxFileSize: 25 * 1024 * 1024,
       setChannel: vi.fn(),
+      validateChannelId: vi.fn(() => true),
       sendMessage: vi.fn(),
-      sendEmbed: vi.fn(),
+      sendNotification: vi.fn(),
       sendFile: vi.fn(),
       askQuestion: vi.fn(),
       waitForMessage: vi.fn(),
-      getActiveChannel: vi.fn(() => ({ name: 'test-channel' })),
+      getActiveChannelName: vi.fn(() => 'test-channel'),
       buffer: {
         getAll: vi.fn(() => []),
         getNewSinceLastRead: vi.fn(() => []),
@@ -31,13 +35,13 @@ describe('Tool Registration', () => {
 
   it('registers all 7 tools without errors', () => {
     expect(() => {
-      registerSetChannel(server, mockDiscord);
-      registerSendMessage(server, mockDiscord);
-      registerSendNotification(server, mockDiscord);
-      registerSendFile(server, mockDiscord);
-      registerCheckMessages(server, mockDiscord);
-      registerAskQuestion(server, mockDiscord);
-      registerWaitForMessage(server, mockDiscord);
+      registerSetChannel(server, mockClient);
+      registerSendMessage(server, mockClient);
+      registerSendNotification(server, mockClient);
+      registerSendFile(server, mockClient);
+      registerCheckMessages(server, mockClient);
+      registerAskQuestion(server, mockClient);
+      registerWaitForMessage(server, mockClient);
     }).not.toThrow();
   });
 });

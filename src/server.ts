@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { DiscordClient } from './discord/client.js';
+import type { MessagingClient } from './platform/messaging-client.js';
 import { registerSetChannel } from './tools/set-channel.js';
 import { registerSendMessage } from './tools/send-message.js';
 import { registerSendNotification } from './tools/send-notification.js';
@@ -9,36 +9,49 @@ import { registerCheckMessages } from './tools/check-messages.js';
 import { registerAskQuestion } from './tools/ask-question.js';
 import { registerWaitForMessage } from './tools/wait-for-message.js';
 
-const token = process.env.DISCORD_BOT_TOKEN;
-if (!token) {
-  process.exit(1);
-}
+const platform = (process.env.PERSEPHONE_PLATFORM ?? 'discord').toLowerCase();
 
-const discord = new DiscordClient(token);
+let client: MessagingClient;
+
+if (platform === 'telegram') {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    process.exit(1);
+  }
+  const { TelegramClient } = await import('./platform/telegram/client.js');
+  client = new TelegramClient(token);
+} else {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) {
+    process.exit(1);
+  }
+  const { DiscordClient } = await import('./platform/discord/client.js');
+  client = new DiscordClient(token);
+}
 
 const server = new McpServer({
   name: 'persephone',
-  version: '0.2.0',
+  version: '0.3.0',
 });
 
-registerSetChannel(server, discord);
-registerSendMessage(server, discord);
-registerSendNotification(server, discord);
-registerSendFile(server, discord);
-registerCheckMessages(server, discord);
-registerAskQuestion(server, discord);
-registerWaitForMessage(server, discord);
+registerSetChannel(server, client);
+registerSendMessage(server, client);
+registerSendNotification(server, client);
+registerSendFile(server, client);
+registerCheckMessages(server, client);
+registerAskQuestion(server, client);
+registerWaitForMessage(server, client);
 
 try {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 } catch {
-  await discord.destroy();
+  await client.destroy();
   process.exit(1);
 }
 
 async function shutdown() {
-  await discord.destroy();
+  await client.destroy();
   await server.close();
   process.exit(0);
 }
