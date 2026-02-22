@@ -65,7 +65,7 @@ export function registerSendFile(server: McpServer, client: MessagingClient): vo
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
-    } catch (error) {
+    } catch {
       return {
         content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Failed to send file' }) }],
         isError: true,

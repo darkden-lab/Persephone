@@ -19,7 +19,6 @@ async function getTranscriber(): Promise<AsrPipeline | null> {
   if (initFailed) return null;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // Whisper encoder is sensitive to quantization — keep at fp16 for accuracy,
     // use q4 for decoder to reduce model size (~150MB vs ~500MB fp32).
     transcriber = await (pipeline as any)('automatic-speech-recognition', MODEL_ID, {

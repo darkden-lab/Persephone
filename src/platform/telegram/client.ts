@@ -11,9 +11,7 @@ import type {
   AskQuestionResult,
 } from '../messaging-client.js';
 import {
-  isAudioAttachment,
   processAudioAttachment,
-  type DiscordAttachment,
 } from '../../audio/voice-message-handler.js';
 import { isSupportedAudioType } from '../../audio/decoder.js';
 import { createReadStream } from 'node:fs';
