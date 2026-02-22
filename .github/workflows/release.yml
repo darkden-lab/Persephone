@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Test & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Package release artifact
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          ARTIFACT_NAME="persephone-${VERSION}"
+
+          mkdir -p "${ARTIFACT_NAME}"
+
+          cp -r dist/ "${ARTIFACT_NAME}/dist/"
+          cp -r .claude-plugin/ "${ARTIFACT_NAME}/.claude-plugin/"
+          cp -r skills/ "${ARTIFACT_NAME}/skills/"
+          cp package.json "${ARTIFACT_NAME}/"
+          cp package-lock.json "${ARTIFACT_NAME}/"
+          cp README.md "${ARTIFACT_NAME}/"
+          cp LICENSE "${ARTIFACT_NAME}/"
+          cp SECURITY.md "${ARTIFACT_NAME}/"
+
+          tar -czf "${ARTIFACT_NAME}.tar.gz" "${ARTIFACT_NAME}"
+
+          echo "ARTIFACT_PATH=${ARTIFACT_NAME}.tar.gz" >> "$GITHUB_ENV"
+          echo "ARTIFACT_NAME=${ARTIFACT_NAME}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ${{ env.ARTIFACT_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
