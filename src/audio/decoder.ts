@@ -19,11 +19,20 @@ export function isSupportedAudioType(contentType: string | null): boolean {
   return SUPPORTED_MIME_TYPES.has(mime);
 }
 
+// Max 5 minutes at 16kHz target = 4,800,000 samples
+const MAX_OUTPUT_SAMPLES = 16000 * 300;
+
 function resample(input: Float32Array, inputRate: number, outputRate: number): Float32Array {
+  if (inputRate < 8000 || inputRate > 384000) {
+    throw new Error(`Invalid sample rate: ${inputRate}`);
+  }
   if (inputRate === outputRate) return input;
 
   const ratio = inputRate / outputRate;
   const outputLength = Math.round(input.length / ratio);
+  if (outputLength > MAX_OUTPUT_SAMPLES) {
+    throw new Error('Audio too long (exceeds 5 minute limit)');
+  }
   const output = new Float32Array(outputLength);
 
   for (let i = 0; i < outputLength; i++) {
@@ -163,9 +172,9 @@ export async function decodeWavToPcm(wavData: Uint8Array): Promise<Float32Array>
       return resample(samples, sampleRate, TARGET_SAMPLE_RATE);
     }
 
-    offset += 8 + chunkSize;
-    // Chunks are word-aligned
-    if (chunkSize % 2 !== 0) offset++;
+    const advance = 8 + chunkSize + (chunkSize % 2 !== 0 ? 1 : 0);
+    if (advance === 0) throw new Error('WAV: zero-size chunk');
+    offset += advance;
   }
 
   throw new Error('WAV: no data chunk found');

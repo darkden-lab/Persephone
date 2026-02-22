@@ -11,7 +11,7 @@ export function registerAskQuestion(server: McpServer, client: MessagingClient):
         .min(2)
         .max(5)
         .describe('Button labels for the available choices (2-5 options)'),
-      timeout: z.number().optional()
+      timeout: z.number().min(1).max(3600).optional()
         .describe('Timeout in seconds to wait for a response (default: 120)'),
     },
   }, async ({ question, options, timeout }) => {
@@ -22,7 +22,7 @@ export function registerAskQuestion(server: McpServer, client: MessagingClient):
       };
     } catch (error) {
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ error: String(error) }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Failed to ask question' }) }],
         isError: true,
       };
     }
