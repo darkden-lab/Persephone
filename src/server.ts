@@ -16,6 +16,7 @@ let client: MessagingClient;
 if (platform === 'telegram') {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
+    console.error('TELEGRAM_BOT_TOKEN environment variable is required for the Telegram platform.');
     process.exit(1);
   }
   const { TelegramClient } = await import('./platform/telegram/client.js');
@@ -23,6 +24,7 @@ if (platform === 'telegram') {
 } else {
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token) {
+    console.error('DISCORD_BOT_TOKEN environment variable is required for the Discord platform.');
     process.exit(1);
   }
   const { DiscordClient } = await import('./platform/discord/client.js');

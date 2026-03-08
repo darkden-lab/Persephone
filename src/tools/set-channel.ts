@@ -28,9 +28,9 @@ export function registerSetChannel(server: McpServer, client: MessagingClient): 
           }),
         }],
       };
-    } catch (error) {
+    } catch {
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: String(error) }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'Failed to set channel' }) }],
         isError: true,
       };
     }

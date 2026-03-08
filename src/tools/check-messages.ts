@@ -42,9 +42,9 @@ export function registerCheckMessages(server: McpServer, client: MessagingClient
           }),
         }],
       };
-    } catch (error) {
+    } catch {
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ error: String(error) }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Failed to check messages' }) }],
         isError: true,
       };
     }

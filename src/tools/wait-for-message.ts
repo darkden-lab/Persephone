@@ -46,9 +46,9 @@ export function registerWaitForMessage(server: McpServer, client: MessagingClien
           }),
         }],
       };
-    } catch (error) {
+    } catch {
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ received: false, error: String(error) }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ received: false, error: 'Failed to wait for message' }) }],
         isError: true,
       };
     }

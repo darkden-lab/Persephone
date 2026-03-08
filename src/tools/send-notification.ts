@@ -20,9 +20,9 @@ export function registerSendNotification(server: McpServer, client: MessagingCli
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
-    } catch (error) {
+    } catch {
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ error: String(error) }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Failed to send notification' }) }],
         isError: true,
       };
     }

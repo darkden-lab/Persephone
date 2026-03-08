@@ -16,6 +16,10 @@ import {
 import { isSupportedAudioType } from '../../audio/decoder.js';
 import { createReadStream } from 'node:fs';
 
+function escapeMarkdown(text: string): string {
+  return text.replace(/([_*`\[])/g, '\\$1');
+}
+
 const NOTIFICATION_EMOJIS = {
   success: '\u2705',
   error: '\u274C',
@@ -34,8 +38,10 @@ export class TelegramClient implements MessagingClient {
   private activeChatName: string | null = null;
   private readyResolve!: () => void;
   private readyPromise: Promise<void>;
-  private pendingWaitResolve: ((msg: BufferedMessage) => void) | null = null;
+  private pendingWaitAbort: AbortController | null = null;
+  private messageListeners: Set<() => void> = new Set();
   private pendingCallbacks = new Map<string, (answer: string, respondent: string) => void>();
+  private launchFailed = false;
 
   constructor(token: string) {
     this.buffer = new MessageBuffer(100);
@@ -83,7 +89,9 @@ export class TelegramClient implements MessagingClient {
     // Launch the bot
     this.bot.launch().then(() => {
       this.readyResolve();
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('Telegram bot launch failed:', err);
+      this.launchFailed = true;
       this.readyResolve();
     });
   }
@@ -104,8 +112,7 @@ export class TelegramClient implements MessagingClient {
       };
 
       this.buffer.push(buffered);
-      this.pendingWaitResolve?.(buffered);
-      this.pendingWaitResolve = null;
+      this.notifyMessageListeners();
     } catch {
       // Silently ignore
     }
@@ -139,8 +146,7 @@ export class TelegramClient implements MessagingClient {
         buffered.transcription = '[download failed]';
       });
 
-      this.pendingWaitResolve?.(buffered);
-      this.pendingWaitResolve = null;
+      this.notifyMessageListeners();
     } catch {
       // Silently ignore
     }
@@ -178,8 +184,7 @@ export class TelegramClient implements MessagingClient {
         this.buffer.push(buffered);
       }
 
-      this.pendingWaitResolve?.(buffered);
-      this.pendingWaitResolve = null;
+      this.notifyMessageListeners();
     } catch {
       // Silently ignore
     }
@@ -217,10 +222,15 @@ export class TelegramClient implements MessagingClient {
         this.buffer.push(buffered);
       }
 
-      this.pendingWaitResolve?.(buffered);
-      this.pendingWaitResolve = null;
+      this.notifyMessageListeners();
     } catch {
       // Silently ignore
+    }
+  }
+
+  private notifyMessageListeners(): void {
+    for (const listener of this.messageListeners) {
+      listener();
     }
   }
 
@@ -229,6 +239,8 @@ export class TelegramClient implements MessagingClient {
   }
 
   async destroy(): Promise<void> {
+    this.pendingWaitAbort?.abort();
+    this.pendingWaitAbort = null;
     this.activeChatId = null;
     this.activeChatName = null;
     this.buffer.clear();
@@ -243,19 +255,25 @@ export class TelegramClient implements MessagingClient {
 
   async setChannel(channelId: string): Promise<ChannelInfo> {
     await this.readyPromise;
+    if (this.launchFailed) {
+      throw new Error('Telegram bot failed to launch. Check TELEGRAM_BOT_TOKEN and network connectivity.');
+    }
     const chat = await this.bot.telegram.getChat(channelId);
     this.activeChatId = channelId;
 
     let channelName = 'Unknown';
+    let contextName = 'Unknown';
     if ('title' in chat) {
       channelName = chat.title ?? 'Unknown';
+      contextName = chat.title ?? 'Unknown';
     } else if ('first_name' in chat) {
       channelName = chat.first_name ?? 'Unknown';
+      contextName = ('username' in chat && chat.username) ? chat.username : chat.first_name ?? 'Unknown';
     }
     this.activeChatName = channelName;
 
     this.buffer.clear();
-    return { channel_name: channelName };
+    return { channel_name: channelName, context_name: contextName };
   }
 
   getActiveChannelName(): string {
@@ -272,11 +290,12 @@ export class TelegramClient implements MessagingClient {
     return this.activeChatId;
   }
 
-  async sendMessage(content: string): Promise<SendMessageResult> {
+  async sendMessage(content: string, format: 'text' | 'markdown' | 'codeblock' = 'text'): Promise<SendMessageResult> {
     const chatId = this.getChatId();
+    const safeContent = format === 'text' ? escapeMarkdown(content) : content;
 
-    if (content.length <= this.maxMessageLength) {
-      const msg = await this.bot.telegram.sendMessage(chatId, content, { parse_mode: 'Markdown' });
+    if (safeContent.length <= this.maxMessageLength) {
+      const msg = await this.bot.telegram.sendMessage(chatId, safeContent, { parse_mode: 'Markdown' });
       return {
         message_id: msg.message_id.toString(),
         timestamp: new Date(msg.date * 1000).toISOString(),
@@ -284,7 +303,7 @@ export class TelegramClient implements MessagingClient {
     }
 
     // Split long messages
-    const chunks = this.splitMessage(content, this.maxMessageLength);
+    const chunks = this.splitMessage(safeContent, this.maxMessageLength);
     let lastMsg: { message_id: number; date: number } | null = null;
     for (const chunk of chunks) {
       lastMsg = await this.bot.telegram.sendMessage(chatId, chunk, { parse_mode: 'Markdown' });
@@ -320,9 +339,19 @@ export class TelegramClient implements MessagingClient {
       caption: msgText,
     });
 
+    let fileUrl = '';
+    try {
+      if (msg.document?.file_id) {
+        const link = await this.bot.telegram.getFileLink(msg.document.file_id);
+        fileUrl = link.href;
+      }
+    } catch {
+      // Fall back to empty string if file link retrieval fails
+    }
+
     return {
       message_id: msg.message_id.toString(),
-      file_url: '',
+      file_url: fileUrl,
     };
   }
 
@@ -396,22 +425,38 @@ export class TelegramClient implements MessagingClient {
       return existing[0];
     }
 
+    // Abort any previous pending wait before starting a new one
+    this.pendingWaitAbort?.abort();
+    const abortController = new AbortController();
+    this.pendingWaitAbort = abortController;
+
     return new Promise<BufferedMessage>((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.messageListeners.delete(handler);
+        this.pendingWaitAbort = null;
+      };
+
+      abortController.signal.addEventListener('abort', () => {
+        cleanup();
+        reject(new Error('Wait aborted due to client shutdown'));
+      });
+
       const timer = setTimeout(() => {
-        this.pendingWaitResolve = null;
+        cleanup();
         reject(new Error(`No message received within ${timeout} seconds`));
       }, timeout * 1000);
 
-      this.pendingWaitResolve = (msg: BufferedMessage) => {
-        clearTimeout(timer);
+      const handler = () => {
+        cleanup();
         // Read from buffer to advance the read pointer
         const newMessages = this.buffer.getNewSinceLastRead(1);
         if (newMessages.length > 0) {
           resolve(newMessages[0]);
-        } else {
-          resolve(msg);
         }
       };
+
+      this.messageListeners.add(handler);
     });
   }
 
